@@ -1,7 +1,7 @@
 # Only the next 3 lines need to be edited - leave the rest!
-TARGET = server
+TARGET = server2
 DEPS = rdwrn.h
-OBJ = rdwrn.o server.o
+OBJ = rdwrn.o server2.o
 
 CC=cc
 CFLAGS=-I. -Wall -g -O0 -pthread
