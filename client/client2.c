@@ -6,46 +6,11 @@
 #include<unistd.h>
 #include <stdlib.h>
 
-void getStudentId(int); 
-
-void getStudentId(int socketDesc){
- printf("I am in the getstudent id");
- char server_reply[2000]; 
-
- char*  message="Hello from client";
-
- //send the data 
- writen(socketDesc, message, strlen(message)); 
-
- //receive the data  
- readn(socketDesc,server_reply, 2000);
-
- puts(server_reply);
- 
-}
-
-void getRandomNumbers(int socketDesc)
-{
-
-}
-
-void getUname(int socketDesc)
-{
-
-}
-
-void getFileNames(int socketDesc)
-{
-
-}
-
-
 int main(void)
 {
   //a variable to take the descriptor returned by the socket
   int socket_desc; 
   struct sockaddr_in server;
-  int choice, connection;
 
   //Create a socket which takes the domain, type, protocol 
   socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -60,54 +25,91 @@ int main(void)
   server.sin_addr.s_addr = inet_addr("127.0.0.1");
   server.sin_family = AF_INET;
   server.sin_port = htons(50031);
-  
-  //connect to the remote server 
-   
+  int connection;
+  connection=connect(socket_desc, (struct sockaddr *)&server, sizeof(server));
 
-  while((connection=connect(socket_desc, (struct sockaddr *)&server, sizeof(server))) >=0)
+   if(connection < 0){
+     perror("Error-connect failed");
+      exit(1);
+    }else{
+     printf("Connected to server.....\n");
+   }
+
+  while(connection == 0)
   {
-   printf("connected\n");
+
+   void getStudentId(int); 
+   void getRandomNumbers(int); 
+   void getUname(int); 
+   void getFileNames(int); 
+    
+   
+   int choice; 
    printf("1. Get student ID\n"); 
    printf("2. Get 5 random numbers\n"); 
    printf("3. The server uname\n"); 
    printf("4. Obtain file names in the current working directory\n"); 
    printf("5. Exits the program\n");
    printf("Enter your choice: \n");
-   scanf("%d", &choice);  
-   printf("user choice is %d", choice);
-
+   scanf("%d", &choice);
+   
    switch(choice)
    {
       case 1: 
-	   getStudentId(socket_desc);
-	   break; 
+	      getStudentId(socket_desc);
+	      break;
       case 2: 
-           getRandomNumbers(socket_desc);
-	   break; 
+	      getRandomNumbers(socket_desc);
+	      break; 
       case 3: 
-	   getUname(socket_desc);
-	   break; 
+	      getUname(socket_desc);
+	      break; 
       case 4: 
-	   getFileNames(socket_desc);
-	   break;
-      case 5: 
-	   printf("Terminating...\n");
-	   exit(0); 
+	      getFileNames(socket_desc);
+	      break;
+      case 5:
+	      printf("Terminating...\n");
+	      exit(0); 
       default: 
-	  printf("The choice does not exist");  
+	      printf("The choice does not exist");  
    }
    
   }
-
- if(connection <0){
-  perror("Error-connect failed");
-  exit(1);
-  }
-
-
-
   close(socket_desc);
   return 0;
- 
-
 }
+
+void getStudentId(int socketDesc){
+    
+    char users_option[] = "Option is 1";
+    char server_reply[32];
+     
+    size_t payload_length = strlen(users_option) + 1; 
+
+    //send the option 
+
+    writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+    writen(socketDesc, (unsigned char *) users_option, payload_length); 
+
+    //receive the userId 
+    
+    readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
+    readn(socketDesc, (unsigned char *) server_reply, payload_length); 
+
+    printf("The user id is: %s\n", server_reply); 
+}
+
+ void getRandomNumbers(int socketDesc){
+
+ }
+
+ void getUname(int socketDesc)
+ {
+ }
+
+ void getFileNames(int socketDesc)
+ {
+
+ }
+
+

@@ -7,7 +7,7 @@
 #include<unistd.h> 
 #include<pthread.h> //threading
 
-void *client_handler(void *); 
+
 void handleStudentId(int); 
 void handleRandomNumber(int); 
 void handleSystemInfo(int); 
@@ -50,32 +50,32 @@ int main(void)
  
  puts("Waiting for incoming connections..");
  c=sizeof(struct sockaddr_in);
- while((new_socket=accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) >= 0)
+ while(1)
  {
-
- printf("Waiting for a client to connect...\n");
+  void *client_handler(void *);
+  printf("Waiting for a client to connect...\n");
  
- printf("Connection accepted....\n");
+  new_socket=accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
 
- pthread_t sniffer_thread;  
+   if(new_socket<0)
+   {
+     perror("Accept failed");
+     exit(EXIT_FAILURE);
+   }else{
+     printf("Connection accepted...\n");
+   }
 
- if(pthread_create(&sniffer_thread, NULL, client_handler, (void*) &new_socket) <0)
- {
-   perror("Could not create thread"); 
-   exit(EXIT_FAILURE); 
- }
+   pthread_t sniffer_thread;  
 
+   if(pthread_create(&sniffer_thread, NULL, client_handler, (void*) &new_socket) <0)
+   {
+     perror("Could not create thread"); 
+     exit(EXIT_FAILURE); 
+   }
 
- //Join the thread, so that we don't terminate before the thread
- pthread_join(sniffer_thread, NULL); 
- puts("Handler assigned\n");
- }
-
- if(new_socket<0)
- {
-  perror("Accept failed");
-  return 1;
-
+    //Join the thread, so that we don't terminate before the thread
+    pthread_join(sniffer_thread, NULL); 
+    puts("Handler assigned\n");
  }
 
  exit(EXIT_SUCCESS);
@@ -88,43 +88,27 @@ int main(void)
  * */
 
 void *client_handler(void *socket_desc){
- 
-  //Get the socket descriptor 
-  int sock = *(int *)socket_desc;	
-  char  client_option[2000];
-  int read_size;
+  //get the desciptor
+  int sock = *(int *)socket_desc;
+  while(1){
+    char  clientMessage[30];
+    size_t payload_length;
+    int read_size;
 
-  //read the option from client 
-  while((read_size=readn(sock, client_option, 2000) )> 0){
-     write(sock, client_option, strlen(client_option));
-     //switch(atoi(client_option)){
-	  //case 1: 
-	      //handleStudentId(sock);
-	      //break;
-	  //case 2: 
-	      //handleRandomNumber(sock);
-	     // break;
-	  //case 3: 
-	      //handleSystemInfo(sock);
-	     // break;
-	  //case 4: 
-	      //handleReadFromFile(sock);
-      //}
-
- } 
-
-
- if(read_size == 0)
-  {
-    puts("client disconected");
-  }else if (read_size == -1)
-  {
-     perror("receive failed");
+    readn(sock, (unsigned char *) &payload_length, sizeof(size_t)); 
+    read_size=readn(sock, (unsigned char *) clientMessage, payload_length);
+    
+    if(read_size == 0){
+     puts("client disconected\n");
+     fflush(stdout); 
+    }else if(read_size == -1){
+     perror("recieved error\n");
+    }
+   
+    writen(sock, (unsigned char *) &payload_length, sizeof(size_t)); 
+    writen(sock, (unsigned char *) clientMessage, payload_length); 
   }
-  
-  //Free the socket pointer
-  free(socket_desc);
-  
+
   //cleanup the socket
   shutdown(sock, SHUT_RDWR);  
   close(sock); 
