@@ -6,8 +6,24 @@
 #include<unistd.h>
 #include <stdlib.h>
 
+typedef struct {
+  char name[50]; 
+  char release[50]; 
+  char version[50]; 
+  char nodeName[50];
+  char hardwareName[25]; 
+  char hardwarePlatform[25];
+  char processorType[50]; 
+  char operatingSystem[50]; 
+} uname; 
+
 int main(void)
 {
+   //declaration of functions to use in the while loop
+   void getStudentId(int);
+   void getRandomNumbers(int);
+   void getUname(int);
+   void getFileNames(int);	
   //a variable to take the descriptor returned by the socket
   int socket_desc; 
   struct sockaddr_in server;
@@ -37,13 +53,6 @@ int main(void)
 
   while(connection == 0)
   {
-
-   void getStudentId(int); 
-   void getRandomNumbers(int); 
-   void getUname(int); 
-   void getFileNames(int); 
-    
-   
    int choice; 
    printf("1. Get student ID\n"); 
    printf("2. Get 5 random numbers\n"); 
@@ -81,30 +90,66 @@ int main(void)
 
 void getStudentId(int socketDesc){
     
-    char users_option[] = "Option is 1";
-    char server_reply[32];
+    int user_option = 1;
+    char server_reply[100];
      
-    size_t payload_length = strlen(users_option) + 1; 
+    size_t payload_length;
 
     //send the option 
 
     writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
-    writen(socketDesc, (unsigned char *) users_option, payload_length); 
+    writen(socketDesc, (unsigned char *) &user_option, sizeof(int)); 
 
     //receive the userId 
     
     readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
     readn(socketDesc, (unsigned char *) server_reply, payload_length); 
-
-    printf("The user id is: %s\n", server_reply); 
+    
+    printf("==============Start of Result==========\n");
+    printf("The Student is prefixed with ip address: %s", server_reply);
+    printf("===============End of Result==========\n"); 
 }
 
  void getRandomNumbers(int socketDesc){
+  
+ int user_option = 2; 
+ int server_reply[5]; 
+ int i;
+ size_t payload_length; 
 
+ //send the option 
+ writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
+ writen(socketDesc, (unsigned char *) &user_option, sizeof(int));
+
+ //recieve the random numbers
+ readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
+ readn(socketDesc, (unsigned char *) server_reply, payload_length);
+
+ printf("==============Start of Result==========\n");
+ printf("The five random numbers are ");
+ for(i=0; i<5; i++){
+  printf("%d ", server_reply[i]); 
+  
+  if(i==4){
+   printf("\n");
+  }
+ }
+ printf("===============End of Result==========\n");
  }
 
  void getUname(int socketDesc)
  {
+   int user_option = 3; 
+   uname *uname1; 
+   size_t payload_length;
+
+   //send the option 
+   writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
+   writen(socketDesc, (unsigned char *) &user_option, sizeof(int)); 
+
+   //receive a struct
+   readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+   readn(socketDesc, (unsigned char *) uname1, payload_length);
  }
 
  void getFileNames(int socketDesc)
