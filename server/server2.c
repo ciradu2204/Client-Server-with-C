@@ -6,6 +6,19 @@
 #include<stdlib.h>
 #include<unistd.h> 
 #include<pthread.h> //threading
+#include<sys/utsname.h> //uname
+#include<dirent.h>
+#include<errno.h>
+#include<sys/stat.h>
+
+typedef struct {
+  char sysname[50];
+  char release[50];
+  char version[50];
+  char nodename[50];
+  char machine[25];
+} systemInfo;
+
 
 int main(void)
 {
@@ -96,8 +109,13 @@ void *client_handler(void *socket_desc){
   int sock = *(int *)socket_desc;
   void handleStudentId(int);
   void handleRandomNumber(int);
-  void handleSystemInfo(int);
+  void handleSystemInfo(int, systemInfo *uname1);
   void handleReadFromFile(int);
+  void fileTransfer(int); 
+  
+  systemInfo *uname1; 
+  uname1 = (systemInfo *) malloc(sizeof(systemInfo)); 
+
   while(1){
     int user_option;
     size_t payload_length;
@@ -122,15 +140,18 @@ void *client_handler(void *socket_desc){
 		 handleRandomNumber(sock); 
 		 break; 
 	    case 3: 
-		 handleSystemInfo(sock); 
+		 handleSystemInfo(sock, uname1); 
 		 break; 
 	    case 4: 
 		 handleReadFromFile(sock); 
-	   
+	    case 5: 
+		fileTransfer(sock);  
 
     }
    
   }
+
+  free(uname1);
 
   //cleanup the socket
   shutdown(sock, SHUT_RDWR);  
@@ -185,9 +206,144 @@ writen(sock, (unsigned char *)randomNumbers, n);
 
 }
 
-void handleSystemInfo(int sock){
+void handleSystemInfo(int sock, systemInfo *uname1){
+  struct utsname uname_pointer; 
+  size_t payload_length = sizeof(systemInfo); 
+  
+  //Get the system information
+  uname(&uname_pointer);
+
+  //Edit the uname structure
+  strcpy(uname1->sysname,uname_pointer.sysname); 
+  strcpy(uname1->release,uname_pointer.release); 
+  strcpy(uname1->version,uname_pointer.version); 
+  strcpy(uname1->machine,uname_pointer.machine); 
+  strcpy(uname1->nodename,uname_pointer.nodename); 
+  
+  //send the uname structure to the client
+  writen(sock, (unsigned char *) &payload_length, sizeof(size_t)); 
+  writen(sock, (unsigned char *) uname1, payload_length);
 
 }
 
 void handleReadFromFile(int sock){
+  DIR * dir = opendir("upload");
+  struct dirent **namelist;  
+  char fileNamesList[2000]; 
+  char errorMessage[100];
+  int n;
+
+  if(dir){
+   //directory exist 
+     //Read all the files in the upload directory in alphabetic order
+      n= scandir("upload", &namelist, NULL, alphasort); 
+      if(n==-1){
+	  strcpy(errorMessage,"Can't read the directory");
+	  perror("can't read the directory");
+	  exit(EXIT_FAILURE);
+      }
+      //read the filenames
+      struct stat *stats;
+      stats =  malloc(sizeof(stat));
+
+      while(n--){
+	  char path[50] = "/upload/";
+	  //get the file pathname
+	  //strcat(path, namelist[n]->d_name);
+	  if(stat(path, stats)<0){
+	   //int err = errno;  
+	  }
+          
+           //check if the filename has read access
+	   if((stats->st_mode && S_IROTH) && S_ISREG(stats->st_mode)){
+                  strcat(fileNamesList, namelist[n]->d_name);
+		  strcat(fileNamesList, "*");
+	    }
+
+
+	     free(namelist[n]);
+	   
+       }
+      free(stats);
+      free(namelist); 
+     
+   
+   closedir(dir);
+  }else if(ENOENT == errno){
+  strcpy(errorMessage,"The directory does not exist");
+  perror("The directory does not exist");
+  }else if(EACCES == errno){
+  strcpy(errorMessage, "You don't have access to the directory");
+  perror("You don't have access to the directory");
+  }else{
+  strcpy(errorMessage,"Unknown error while trying to open the directory"); 
+  perror("Unknown error  while trying to open the directory");
+  }
+
+  
+
+  //send the name of files to the user and error messages
+
+  if(strlen(fileNamesList) == 0){
+  
+  size_t payload_length= strlen(errorMessage) + 1; 
+  writen(sock, (unsigned char *) &payload_length, sizeof(size_t));
+  writen(sock, (unsigned char *) errorMessage, payload_length);
+
+  }else{
+  size_t payload_length = strlen(fileNamesList) + 1;
+  writen(sock, (unsigned char *) &payload_length, sizeof(size_t));
+  writen(sock, (unsigned char *) fileNamesList, payload_length);
+  }
+ 
+}
+
+void fileTransfer(int sock){
+
+ char fileName[100];
+ size_t payload_length; 
+ char errorMessage[100];
+ char path[100]; 
+ char fileBuffer[2000];
+ FILE *fp; 
+
+ //read the user file
+ readn(sock, (unsigned char *) &payload_length, sizeof(size_t)); 
+ readn(sock, (unsigned char *) fileName, payload_length); 
+
+ //create a path 
+ strcat(path, "upload/");
+ strcat(path, fileName);
+ struct stat filestate;
+ 
+ //check the status of the file
+ if(stat(path, &filestate) <0){
+   strcpy(errorMessage, "The file does not exit");
+   perror("The file does not exit");   
+ }else{
+   fp = fopen(path, "r"); 
+   //can't open the filename
+   if(fp == NULL){
+   strcpy(errorMessage, "the file can not be open"); 
+   perror("The file can not be open");
+   }else{
+   fscanf(fp, "%s", fileBuffer);
+
+   payload_length = strlen(fileBuffer) + 1; 
+   
+   }
+   //send the filename
+   payload_length = strlen(fileBuffer) + 1;
+   writen(sock , (unsigned char *)&payload_length, sizeof(size_t));
+   writen (sock, (unsigned char *)fileBuffer, payload_length);
+
+   payload_length = strlen(errorMessage) + 1;
+   writen(sock, (unsigned char *)&payload_length, sizeof(size_t));
+   writen(sock, (unsigned char *)errorMessage, payload_length);
+
+
+   fclose(fp); 
+ }
+
+
 }

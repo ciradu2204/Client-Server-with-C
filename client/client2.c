@@ -4,26 +4,25 @@
 #include<string.h> //strlen
 #include"rdwrn.h" //readn() and written()
 #include<unistd.h>
-#include <stdlib.h>
+#include<stdlib.h> 
 
 typedef struct {
-  char name[50]; 
-  char release[50]; 
-  char version[50]; 
-  char nodeName[50];
-  char hardwareName[25]; 
-  char hardwarePlatform[25];
-  char processorType[50]; 
-  char operatingSystem[50]; 
-} uname; 
+  char sysname[50];
+  char release[50];
+  char version[50];
+  char nodename[50];
+  char machine[25];
+} systemInfo;
+
 
 int main(void)
 {
-   //declaration of functions to use in the while loop
-   void getStudentId(int);
-   void getRandomNumbers(int);
-   void getUname(int);
-   void getFileNames(int);	
+  //declaration of functions to use in the while loop
+  void getStudentId(int);
+  void getRandomNumbers(int);
+  void getUname(int, systemInfo *uname1);
+  void getFileNames(int);
+  void fileTransfer(int);  
   //a variable to take the descriptor returned by the socket
   int socket_desc; 
   struct sockaddr_in server;
@@ -51,16 +50,21 @@ int main(void)
      printf("Connected to server.....\n");
    }
 
+
   while(connection == 0)
   {
    int choice; 
+   systemInfo *uname1;
+   uname1 = (systemInfo *) malloc(sizeof(systemInfo));
    printf("1. Get student ID\n"); 
    printf("2. Get 5 random numbers\n"); 
    printf("3. The server uname\n"); 
-   printf("4. Obtain file names in the current working directory\n"); 
-   printf("5. Exits the program\n");
+   printf("4. Obtain file names in the current working directory\n");
+   printf("5. Transfer a file from server to client\n"); 
+   printf("6. Exits the program\n");
    printf("Enter your choice: \n");
    scanf("%d", &choice);
+ 
    
    switch(choice)
    {
@@ -71,18 +75,20 @@ int main(void)
 	      getRandomNumbers(socket_desc);
 	      break; 
       case 3: 
-	      getUname(socket_desc);
+	      getUname(socket_desc, uname1);
 	      break; 
       case 4: 
 	      getFileNames(socket_desc);
 	      break;
-      case 5:
+      case 5: fileTransfer(socket_desc); 
+	      break; 
+      case 6:
 	      printf("Terminating...\n");
 	      exit(0); 
       default: 
 	      printf("The choice does not exist");  
    }
-   
+  free(uname1); 
   }
   close(socket_desc);
   return 0;
@@ -92,7 +98,6 @@ void getStudentId(int socketDesc){
     
     int user_option = 1;
     char server_reply[100];
-     
     size_t payload_length;
 
     //send the option 
@@ -137,11 +142,10 @@ void getStudentId(int socketDesc){
  printf("===============End of Result==========\n");
  }
 
- void getUname(int socketDesc)
+ void getUname(int socketDesc, systemInfo *uname1)
  {
-   int user_option = 3; 
-   uname *uname1; 
-   size_t payload_length;
+   int user_option = 3;  
+   size_t payload_length= sizeof(systemInfo);
 
    //send the option 
    writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
@@ -150,11 +154,99 @@ void getStudentId(int socketDesc){
    //receive a struct
    readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
    readn(socketDesc, (unsigned char *) uname1, payload_length);
+
+   //print the details recieved
+   printf("==========Start of the Result==========\n"); 
+   printf("Kernel name: %s\n", uname1->sysname);
+   printf("Kernel version: %s\n",uname1->version);
+   printf("Node name: %s\n", uname1->nodename);
+   printf("Realease:  %s\n", uname1->release); 
+   printf("Hardware Name: %s\n", uname1->machine); 
+   printf("=======End of Result=================\n"); 
  }
 
  void getFileNames(int socketDesc)
  {
+  int user_option = 4; 
+  size_t payload_length;
+  const char delimeter[2] = "*";
+  char server_reply[2000]; 
+  char *fileName; 
 
+  //send the option 
+  writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+  writen(socketDesc, (unsigned char *) &user_option, sizeof(int)); 
+
+  //read the filenames string 
+  readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+  readn(socketDesc, (unsigned char *) server_reply, payload_length); 
+
+  printf("================Start of Result ==============\n");
+  //parse the string 
+  
+    //get the first name of the file 
+     fileName= strtok(server_reply, delimeter); 
+     
+     //When it's returning an error message
+      if(fileName == NULL){
+	  printf("%s\n", server_reply); 
+       }
+
+    //loop through the remaining filenames 
+      while(fileName != NULL){
+      printf("%s\n", fileName);
+
+      fileName= strtok(NULL, delimeter);
+      }
+   printf("==========End of result=====================\n");
  }
 
+ void fileTransfer(int socketDesc)
+ {
+    int user_option = 5; 
+    char user_fileName[100];
+    size_t payload_length; 
+    FILE *fp;
+    char buffer[2000]; 
+    char errorMessage[100];
+
+    //send the option 
+    writen(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+    writen(socketDesc, (unsigned char *)& user_option, sizeof(int)); 
+
+    //ask user for the file name
+    printf("Please enter the file name\n");
+    scanf("%s", user_fileName); 
+
+    payload_length = strlen(user_fileName) + 1; 
+    
+    //send the user file name to the server
+    writen(socketDesc, (unsigned char*) &payload_length, sizeof(size_t)); 
+    writen(socketDesc, (unsigned char*)user_fileName, payload_length);
+    
+    //read the user response.
+    readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t));
+    readn(socketDesc, (unsigned char *) buffer, sizeof(FILE));
+   
+    //read the error if any
+    readn(socketDesc, (unsigned char *) &payload_length, sizeof(size_t)); 
+    readn(socketDesc, (unsigned char *) errorMessage, payload_length); 
+
+    if(strlen(errorMessage) > 0){
+    printf("=============The start of the result====================\n");
+    printf("%s", errorMessage);
+    printf("============The end of the result=======================\n");
+
+    }else{
+    //create a file name
+    strcat(user_fileName, ".txt");
+    //open the filename to write
+    fp = fopen(user_fileName, "w");
+    fprintf(fp, "%s", buffer);
+
+    printf("=============The start of the result====================\n");
+    printf("File transferred successfully");
+    printf("============The end of the result=======================\n");
+    }
+ }
 
