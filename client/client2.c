@@ -84,7 +84,7 @@ int main(void)
 	      break; 
       case 6:
 	      printf("Terminating...\n");
-	      exit(0); 
+	      return;
       default: 
 	      printf("The choice does not exist");  
    }

@@ -10,7 +10,7 @@
 #include<dirent.h>
 #include<errno.h>
 #include<sys/stat.h>
-
+#include<signal.h>
 typedef struct {
   char sysname[50];
   char release[50];
@@ -19,12 +19,16 @@ typedef struct {
   char machine[25];
 } systemInfo;
 
+static void handler(int signum){
+  printf("The server is closing");
+}
 
 int main(void)
 {
  //a variable to hold the socket descriptor
- int socket_desc= 0, new_socket = 0;  
+ int socket_desc= 0, new_socket = 0;
 
+ struct sigaction new_action, old_action; 
  struct sockaddr_in server, client;
  socklen_t socksize = sizeof(struct sockaddr_in); 
  //create a socket
@@ -94,7 +98,25 @@ int main(void)
      printf("Connection accepted...\n");
    }
 
+ //signal handler using signation 
+ new_action.sa_handler = handler;
+ //empty the mask 
+ sigemptyset(&new_action.sa_mask); 
+ //Block the SIGTERM while the handler is running 
 
+ sigaddset(&new_action.sa_mask, SIGTERM);
+
+ //remove any flags
+ new_action.sa_flags=0;
+
+ sigaction(SIGINT, NULL, &old_action);
+
+ 
+ if(old_action.sa_handler != SIG_IGN){
+    sigaction(SIGINT, &new_action, NULL);
+   }
+
+ 
  exit(EXIT_SUCCESS);
   
 
@@ -107,6 +129,8 @@ int main(void)
 void *client_handler(void *socket_desc){
   //get the desciptor
   int sock = *(int *)socket_desc;
+
+  //declaring function names
   void handleStudentId(int);
   void handleRandomNumber(int);
   void handleSystemInfo(int, systemInfo *uname1);
@@ -126,7 +150,8 @@ void *client_handler(void *socket_desc){
     
     if(read_size == 0){
      puts("client disconected\n");
-     fflush(stdout); 
+     fflush(stdout);
+     break;
     }else if(read_size == -1){
      perror("recieved error\n");
     }
@@ -315,6 +340,8 @@ void fileTransfer(int sock){
  strcat(path, "upload/");
  strcat(path, fileName);
  struct stat filestate;
+ //filestate=malloc(sizeof(stat));
+
  
  //check the status of the file
  if(stat(path, &filestate) <0){
@@ -324,24 +351,23 @@ void fileTransfer(int sock){
    fp = fopen(path, "r"); 
    //can't open the filename
    if(fp == NULL){
+   printf("File can not be opened");
    strcpy(errorMessage, "the file can not be open"); 
-   perror("The file can not be open");
    }else{
+   //copy the file values in a buffer
    fscanf(fp, "%s", fileBuffer);
-
-   payload_length = strlen(fileBuffer) + 1; 
    
-   }
+  }
    //send the filename
    payload_length = strlen(fileBuffer) + 1;
    writen(sock , (unsigned char *)&payload_length, sizeof(size_t));
    writen (sock, (unsigned char *)fileBuffer, payload_length);
-
+   printf("%s", errorMessage);
    payload_length = strlen(errorMessage) + 1;
    writen(sock, (unsigned char *)&payload_length, sizeof(size_t));
    writen(sock, (unsigned char *)errorMessage, payload_length);
 
-
+   //free(filestate);
    fclose(fp); 
  }
 
